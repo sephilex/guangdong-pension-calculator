@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>广东城乡居民养老保险（新农保）精算测算器</title>
+  <style>
+    :root {
+      --bg-page: #0f1012;
+      --bg-card: #1b1c1f;
+      --bg-badge: #131416;
+      --text-primary: #e8eaed;
+      --text-secondary: #9aa0a6;
+      --border-color: #2d2f33;
+      --grid-color: #26282c;
+      --chart-blue: #8ab4f8;   /* 个人本金 / 个账计发 */
+      --chart-green: #5bb974;  /* 退休月领总额 / 20年回本周期 */
+      --chart-yellow: #fcc934; /* 居保账户总额 */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      padding: 20px 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .widget-card {
+      width: 100%;
+      max-width: 740px;
+      background-color: var(--bg-card);
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      border: 1px solid #282a2e;
+    }
+
+    .widget-title {
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+    }
+
+    .widget-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* 顶部两栏汇总数据 */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      margin-bottom: 24px;
+      text-align: center;
+      background: #151619;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px 6px;
+    }
+
+    .summary-item {
+      padding: 2px 8px;
+      position: relative;
+    }
+
+    .summary-item:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 12%;
+      height: 76%;
+      width: 1px;
+      background-color: var(--border-color);
+    }
+
+    .summary-value {
+      font-size: 27px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.25;
+      margin-bottom: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-value.positive {
+      color: var(--chart-green);
+    }
+
+    .summary-value.accent {
+      color: var(--chart-yellow);
+    }
+
+    .summary-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* 快捷档位切换栏 */
+    .preset-bar {
+      margin-bottom: 26px;
+    }
+
+    .preset-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .preset-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .preset-btn {
+      background: var(--bg-badge);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-size: 12px;
+      padding: 6px 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .preset-btn:hover {
+      border-color: #4b4f56;
+      color: var(--text-primary);
+    }
+
+    .preset-btn.active {
+      background: rgba(252, 201, 52, 0.14);
+      border-color: var(--chart-yellow);
+      color: var(--chart-yellow);
+      font-weight: 600;
+    }
+
+    /* 图表区域通用样式 */
+    .chart-block {
+      margin-bottom: 30px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .chart-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .y-axis-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .legend-hint {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .chart-note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 260px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .x-axis-title {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+
+    /* 可点击切换显隐的图例 */
+    .legend-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .legend-item:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+      border-color: #2d2f33;
+      color: var(--text-primary);
+    }
+
+    .legend-item.hidden-series {
+      opacity: 0.35;
+      text-decoration: line-through;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* 滑块与输入框调节区域 */
+    .sliders-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 18px;
+    }
+
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px 28px;
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .slider-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .slider-control {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .range-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      height: 28px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: #3c4043;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 24px;
+      border-radius: 8px;
+      background: var(--bg-card);
+      border: 3px solid #ffffff;
+      cursor: grab;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      cursor: grabbing;
+      transform: scale(1.08);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 24px;
+      border-radius: 8px;
+      background: var(--bg-card);
+      border: 3px solid #ffffff;
+      cursor: grab;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .value-input {
+      width: 88px;
+      padding: 8px 12px;
+      background-color: var(--bg-badge);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      text-align: right;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .value-input:hover {
+      border-color: #4b4f56;
+    }
+
+    .value-input:focus {
+      border-color: var(--chart-yellow);
+      box-shadow: 0 0 0 2px rgba(252, 201, 52, 0.2);
+      background-color: #17191c;
+    }
+
+    /* 底部说明 */
+    .footer-note {
+      margin-top: 26px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* 悬浮提示框 */
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(20, 21, 24, 0.95);
+      border: 1px solid #3c4043;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-primary);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+      display: none;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    .tooltip-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .tooltip-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    .tooltip-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 600px) {
+      .widget-card {
+        padding: 20px 14px;
+        border-radius: 18px;
+      }
+      .summary-value {
+        font-size: 20px;
+      }
+      .summary-label {
+        font-size: 11px;
+      }
+      .sliders-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="widget-card">
+  <div class="widget-title">广东城乡居民养老保险（新农保）精算测算</div>
+  <div class="widget-subtitle">个人缴费 + 政府补贴 + 复利计息 100% 计入个人账户，60周岁按月终身领取</div>
+
+  <!-- 顶部两栏核心结果 -->
+  <div class="summary-row">
+    <div class="summary-item">
+      <div class="summary-value positive" id="sum_monthly">¥318</div>
+      <div class="summary-label" id="sub_monthly">60岁退休·每月可领</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value accent" id="sum_account">¥12,189</div>
+      <div class="summary-label" id="sub_account">个人账户累计(100%可继承)</div>
+    </div>
+  </div>
+
+  <!-- 广东官方档位快捷按钮 -->
+  <div class="preset-bar">
+    <div class="preset-label">快捷选择广东官方缴费档位（点击即切换）：</div>
+    <div class="preset-btns" id="presetBtns">
+      <button class="preset-btn" data-val="180">¥180 最低档</button>
+      <button class="preset-btn" data-val="360">¥360</button>
+      <button class="preset-btn active" data-val="600">¥600 补贴翻倍档</button>
+      <button class="preset-btn" data-val="1200">¥1,200</button>
+      <button class="preset-btn" data-val="1800">¥1,800</button>
+      <button class="preset-btn" data-val="3600">¥3,600</button>
+      <button class="preset-btn" data-val="4800">¥4,800 个人顶格</button>
+      <button class="preset-btn" data-val="9600">¥9,600 顶格+亲属资助</button>
+    </div>
+  </div>
+
+  <!-- 图表一：历年个人账户累计曲线 -->
+  <div class="chart-block">
+    <div class="chart-header-bar">
+      <div class="y-axis-title">图一：个人账户历年累计总额（元）</div>
+      <div class="legend-hint">💡 点击图例可显隐曲线</div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="yearCanvas"></canvas>
+      <div class="chart-tooltip" id="yearTooltip"></div>
+    </div>
+    <div class="x-axis-title">累计缴费年限（年）</div>
+
+    <div class="legend-wrap">
+      <div class="legend-item" onclick="toggleYearSeries('res_account', this)">
+        <span class="legend-dot" style="background: var(--chart-yellow);"></span>
+        <span>城乡居保个人账户总额(含复利+补贴)</span>
+      </div>
+      <div class="legend-item" onclick="toggleYearSeries('principal', this)">
+        <span class="legend-dot" style="background: var(--chart-blue);"></span>
+        <span>个人累计投入纯本金</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图表二（新增）：投保档位 vs 退休月领曲线图 -->
+  <div class="chart-block">
+    <div class="chart-header-bar">
+      <div class="y-axis-title">图二：不同投保档位 vs 60岁退休每月可领（元/月）</div>
+      <div class="legend-hint">⭕ 圆圈处为当前所选档位</div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="tierCanvas"></canvas>
+      <div class="chart-tooltip" id="tierTooltip"></div>
+    </div>
+    <div class="x-axis-title">每年缴费档位（元/年，含亲属社会资助）</div>
+
+    <div class="legend-wrap">
+      <div class="legend-item" onclick="toggleTierSeries('total_monthly', this)">
+        <span class="legend-dot" style="background: var(--chart-green);"></span>
+        <span>退休每月可领总额 (基础养老金+个人账户计发)</span>
+      </div>
+      <div class="legend-item" onclick="toggleTierSeries('acc_monthly', this)">
+        <span class="legend-dot" style="background: var(--chart-blue);"></span>
+        <span>其中：个人账户每月计发额 (账户总额÷139)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图表三：固定缴费年限的回本周期对比 -->
+  <div class="chart-block" id="paybackChart">
+    <div class="chart-header-bar">
+      <div class="y-axis-title">图三：不同缴费年限 vs 各档位回本周期（年）</div>
+      <div class="legend-hint">💡 点击图例可显隐曲线</div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="paybackCanvas"></canvas>
+      <div class="chart-tooltip" id="paybackTooltip"></div>
+    </div>
+    <div class="x-axis-title">每年缴费档位（元/年，含亲属社会资助）</div>
+    <div class="legend-wrap">
+      <div class="legend-item" onclick="togglePaybackSeries('years_15', this)">
+        <span class="legend-dot" style="background: var(--chart-blue);"></span>
+        <span>缴费15年</span>
+      </div>
+      <div class="legend-item" onclick="togglePaybackSeries('years_20', this)">
+        <span class="legend-dot" style="background: var(--chart-green);"></span>
+        <span>缴费20年</span>
+      </div>
+      <div class="legend-item" onclick="togglePaybackSeries('years_30', this)">
+        <span class="legend-dot" style="background: var(--chart-yellow);"></span>
+        <span>缴费30年</span>
+      </div>
+    </div>
+    <div class="chart-note">回本周期 = 个人累计缴费 ÷ 退休后每年领取总额（含基础养老金），从60岁开始领取时起算，越低表示回本越快。圆圈标记当前档位。<br>本图固定对比15、20、30年，随下方利率、基础养老金参数更新；未计资金时间成本、通胀和未来待遇调整。</div>
+  </div>
+
+  <!-- 滑块与可编辑输入框参数区 -->
+  <div class="sliders-title">调整城乡居保参保参数（数字可直接点击输入）</div>
+  <div class="sliders-grid">
+    <div class="slider-group">
+      <div class="slider-label">农村居保年缴费（含亲属资助）</div>
+      <div class="slider-control">
+        <div class="range-wrap">
+          <input type="range" id="s_res_annual" min="180" max="9600" step="1" value="600" />
+        </div>
+        <input type="text" inputmode="decimal" class="value-input" id="v_res_annual" value="¥600" />
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-label">累计缴费年限（年）</div>
+      <div class="slider-control">
+        <div class="range-wrap">
+          <input type="range" id="s_years" min="15" max="35" step="1" value="15" />
+        </div>
+        <input type="text" inputmode="numeric" class="value-input" id="v_years" value="15" />
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-label">账户记账年化利率 (%)</div>
+      <div class="slider-control">
+        <div class="range-wrap">
+          <input type="range" id="s_rate" min="1.5" max="7" step="0.01" value="2.7" />
+        </div>
+        <input type="text" inputmode="decimal" class="value-input" id="v_rate" value="2.7%" />
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-label">当地基础养老金标准 (元/月)</div>
+      <div class="slider-control">
+        <div class="range-wrap">
+          <input type="range" id="s_base_pension" min="210" max="1000" step="5" value="230" />
+        </div>
+        <input type="text" inputmode="decimal" class="value-input" id="v_base_pension" value="¥230" />
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    * 精算规则说明：<br>
+    1. <strong>退休月领公式</strong>：每月到手养老金 = 基础养老金（默认按230元/月，满15年后每多缴1年加发3元/月）+ 个人账户累计本息总额 ÷ 139个月。<br>
+    2. <strong>政府补贴标准</strong>：年缴600元及以上档次政府补贴按60元/年计算，低于600元档次按30元/年计算；个人最高档为4,800元/年，叠加亲属“社会资助”最高可再存4,800元/年（合计9,600元/年）。<br>
+    3. <strong>资金安全保障</strong>：个人缴费、亲属资助、政府补贴及历年复利100%计入个人账户，参保人若中途或退休后身故，剩余个人账户本息可全额继承，并额外发放丧葬补助金。
+  </div>
+</div>
+
+<script>
+  // 参数配置与状态
+  const paramConfig = {
+    res_annual:   { min: 180, max: 9600, step: 300, format: 'currency', val: 600 },
+    years:        { min: 15,  max: 35,   step: 1,   format: 'years',    val: 15 },
+    rate:         { min: 1.5, max: 7.0,  step: 0.1, format: 'percent',  val: 2.7 },
+    base_pension: { min: 210, max: 1000, step: 10,  format: 'currency', val: 230 }
+  };
+
+  // 官方标准档位节点（用于在图二上打点标记）
+  const OFFICIAL_TIERS = [180, 240, 360, 600, 900, 1200, 1800, 3600, 4800, 7200, 9600];
+
+  const visibleYearSeries = { res_account: true, principal: true };
+  const visibleTierSeries = { total_monthly: true, acc_monthly: true };
+  const visiblePaybackSeries = { years_15: true, years_20: true, years_30: true };
+
+  const sliders = {};
+  const inputs = {};
+  Object.keys(paramConfig).forEach(key => {
+    sliders[key] = document.getElementById('s_' + key);
+    inputs[key] = document.getElementById('v_' + key);
+  });
+
+  const yearCanvas = document.getElementById('yearCanvas');
+  const yearCtx = yearCanvas.getContext('2d');
+  const yearTooltip = document.getElementById('yearTooltip');
+
+  const tierCanvas = document.getElementById('tierCanvas');
+  const tierCtx = tierCanvas.getContext('2d');
+  const tierTooltip = document.getElementById('tierTooltip');
+
+  const paybackCanvas = document.getElementById('paybackCanvas');
+  const paybackCtx = paybackCanvas.getContext('2d');
+  const paybackTooltip = document.getElementById('paybackTooltip');
+
+  let yearDataCache = null;
+  let yearGeom = null;
+  let tierDataCache = null;
+  let tierGeom = null;
+  let paybackDataCache = null;
+  let paybackGeom = null;
+
+  function fmtCurrency(val) {
+    return '¥' + Math.round(val).toLocaleString('en-US');
+  }
+
+  function formatDisplayValue(key, val) {
+    const cfg = paramConfig[key];
+    if (cfg.format === 'currency') return fmtCurrency(val);
+    if (cfg.format === 'percent') {
+      const fixed = Number(val.toFixed(2));
+      return (Number.isInteger(fixed) ? fixed.toFixed(1) : fixed) + '%';
+    }
+    return String(Math.round(val));
+  }
+
+  function updateSliderTrack(slider) {
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const val = Math.min(max, Math.max(min, parseFloat(slider.value) || min));
+    const pct = ((val - min) / (max - min)) * 100;
+    slider.style.background = `linear-gradient(to right, #ffffff 0%, #ffffff ${pct}\%, #3c4043 ${pct}%, #3c4043 100%)`;
+  }
+
+  function syncPresetButtons(annualVal) {
+    document.querySelectorAll('#presetBtns .preset-btn').forEach(btn => {
+      const btnVal = parseFloat(btn.getAttribute('data-val'));
+      btn.classList.toggle('active', Math.abs(btnVal - annualVal) < 1);
+    });
+  }
+
+  // 快捷档位按钮绑定
+  document.querySelectorAll('#presetBtns .preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = parseFloat(btn.getAttribute('data-val'));
+      paramConfig.res_annual.val = val;
+      sliders.res_annual.value = val;
+      inputs.res_annual.value = formatDisplayValue('res_annual', val);
+      syncPresetButtons(val);
+      calculateAll();
+    });
+  });
+
+  function toggleYearSeries(key, el) {
+    const activeCount = Object.values(visibleYearSeries).filter(Boolean).length;
+    if (visibleYearSeries[key] && activeCount <= 1) return;
+    visibleYearSeries[key] = !visibleYearSeries[key];
+    el.classList.toggle('hidden-series', !visibleYearSeries[key]);
+    drawYearChart(null);
+  }
+
+  function toggleTierSeries(key, el) {
+    const activeCount = Object.values(visibleTierSeries).filter(Boolean).length;
+    if (visibleTierSeries[key] && activeCount <= 1) return;
+    visibleTierSeries[key] = !visibleTierSeries[key];
+    el.classList.toggle('hidden-series', !visibleTierSeries[key]);
+    drawTierChart(null);
+  }
+
+  function togglePaybackSeries(key, el) {
+    const activeCount = Object.values(visiblePaybackSeries).filter(Boolean).length;
+    if (visiblePaybackSeries[key] && activeCount <= 1) return;
+    visiblePaybackSeries[key] = !visiblePaybackSeries[key];
+    el.classList.toggle('hidden-series', !visiblePaybackSeries[key]);
+    paybackTooltip.style.display = 'none';
+    drawPaybackChart(null);
+  }
+
+  // 根据给定年缴费额、年限、利率计算期末个人账户总额
+  function calcAccountAtEnd(annualPay, years, ratePct) {
+    const govSub = annualPay >= 600 ? 60 : 30;
+    const rMonthly = ratePct / 100 / 12;
+    const n = years * 12;
+    const factor = ratePct > 0 ? (Math.pow(1 + rMonthly, n) - 1) / rMonthly : n;
+    return ((annualPay + govSub) / 12) * factor;
+  }
+
+  function calculateAll() {
+    const res_annual = paramConfig.res_annual.val;
+    const years = Math.max(1, Math.round(paramConfig.years.val));
+    const rate = paramConfig.rate.val;
+    const base_pension = paramConfig.base_pension.val;
+
+    Object.values(sliders).forEach(updateSliderTrack);
+    syncPresetButtons(res_annual);
+
+    // 1. 生成图一数据（按年限 0 ~ years）
+    const res_account = [];
+    const principal = [];
+
+    for (let t = 0; t <= years; t++) {
+      res_account.push(calcAccountAtEnd(res_annual, t, rate));
+      principal.push(res_annual * t);
+    }
+
+    const finalAccount = res_account[years];
+    const effectiveBase = base_pension + (years > 15 ? (years - 15) * 3 : 0);
+    const monthlyAccPension = finalAccount / 139;
+    const totalMonthlyPension = effectiveBase + monthlyAccPension;
+
+    // 更新顶部汇总卡片
+    document.getElementById('sum_monthly').textContent = fmtCurrency(totalMonthlyPension);
+    document.getElementById('sub_monthly').textContent = `基础 ${fmtCurrency(effectiveBase)} + 个账 ${fmtCurrency(monthlyAccPension)}`;
+    document.getElementById('sum_account').textContent = fmtCurrency(finalAccount);
+
+    yearDataCache = {
+      x: Array.from({ length: years + 1 }, (_, i) => i),
+      series: [
+        { key: 'res_account', label: '城乡居保个人账户', color: '#fcc934', values: res_account },
+        { key: 'principal', label: '个人累计本金', color: '#8ab4f8', values: principal }
+      ]
+    };
+    const tiers = [...new Set([...OFFICIAL_TIERS, res_annual])].sort((a, b) => a - b);
+    const accMonthly = tiers.map(tier => calcAccountAtEnd(tier, years, rate) / 139);
+    tierDataCache = {
+      x: tiers,
+      series: [
+        { key: 'total_monthly', label: '退休每月可领总额', color: '#5bb974', values: accMonthly.map(val => val + effectiveBase) },
+        { key: 'acc_monthly', label: '个人账户每月计发额', color: '#8ab4f8', values: accMonthly }
+      ]
+    };
+    // 加密采样呈现回本曲线，600元处保留补贴变化带来的跳跃。
+    const paybackTiers = [...new Set([...tiers, 599,
+      ...Array.from({ length: 158 }, (_, i) => 180 + i * 60)
+    ])].sort((a, b) => a - b);
+    paybackDataCache = {
+      x: paybackTiers,
+      markerX: tiers,
+      formatValue: value => value.toFixed(2) + '年',
+      formatTick: value => String(Number(value.toFixed(2))),
+      series: [
+        { years: 15, color: '#8ab4f8' },
+        { years: 20, color: '#5bb974' },
+        { years: 30, color: '#fcc934' }
+      ].map(item => ({
+        key: 'years_' + item.years,
+        label: `缴费${item.years}年`,
+        color: item.color,
+        values: paybackTiers.map(tier => {
+          const monthly = base_pension + Math.max(0, item.years - 15) * 3
+            + calcAccountAtEnd(tier, item.years, rate) / 139;
+          return tier * item.years / (monthly * 12);
+        })
+      }))
+    };
+    yearTooltip.style.display = 'none';
+    tierTooltip.style.display = 'none';
+    paybackTooltip.style.display = 'none';
+    drawYearChart(null);
+    drawTierChart(null);
+    drawPaybackChart(null);
+  }
+
+  // 按 CSS 尺寸和屏幕像素比绘制，坐标与指针位置统一使用 CSS 像素。
+  function drawChart(canvas, ctx, data, visible, hoverIndex, selectedX, isTier) {
+    const { width, height } = canvas.getBoundingClientRect();
+    if (!data || width <= 0 || height <= 0) return null;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const plot = { left: 54, right: width - 20, top: 18, bottom: height - 32 };
+    const series = data.series.filter(item => visible[item.key]);
+    const maximum = Math.max(1, ...series.flatMap(item => item.values));
+    const roughStep = maximum / 4;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const step = [1, 2, 2.5, 5, 10].find(value => value * magnitude >= roughStep) * magnitude;
+    const yMax = Math.ceil(maximum / step) * step;
+    const xMin = data.x[0];
+    const xMax = data.x[data.x.length - 1];
+    const xPos = value => plot.left + (value - xMin) / (xMax - xMin || 1) * (plot.right - plot.left);
+    const yPos = value => plot.bottom - value / yMax * (plot.bottom - plot.top);
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif';
+    ctx.lineWidth = 1;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= Math.round(yMax / step); i++) {
+      const value = i * step;
+      const y = yPos(value);
+      ctx.strokeStyle = '#2d2f33';
+      ctx.beginPath();
+      ctx.moveTo(plot.left, y);
+      ctx.lineTo(plot.right, y);
+      ctx.stroke();
+      ctx.fillStyle = '#9aa0a6';
+      const label = data.formatTick ? data.formatTick(value)
+        : value >= 10000 ? `${Number((value / 10000).toFixed(2))}万` : String(Math.round(value));
+      ctx.fillText(label, plot.left - 8, y);
+    }
+    const xTicks = isTier
+      ? (width < 450 ? [180, 2400, 4800, 7200, 9600] : [180, 1200, 2400, 3600, 4800, 7200, 9600])
+      : Array.from({ length: 5 }, (_, i) => Math.round(xMax * i / 4));
+    ctx.textAlign = 'center';
+    xTicks.forEach(value => ctx.fillText(value.toLocaleString('en-US'), xPos(value), plot.bottom + 18));
+
+    series.forEach(item => {
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      item.values.forEach((value, i) => {
+        const x = xPos(data.x[i]);
+        const y = yPos(value);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      if (isTier) {
+        item.values.forEach((value, i) => {
+          if (data.markerX && !data.markerX.includes(data.x[i])) return;
+          ctx.fillStyle = item.color;
+          ctx.beginPath();
+          ctx.arc(xPos(data.x[i]), yPos(value), data.x[i] === selectedX ? 5 : 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          if (data.x[i] === selectedX) {
+            ctx.strokeStyle = '#e8eaed';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        });
+      }
+    });
+    if (hoverIndex !== null) {
+      const x = xPos(data.x[hoverIndex]);
+      ctx.strokeStyle = '#9aa0a6';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x, plot.top);
+      ctx.lineTo(x, plot.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      series.forEach(item => {
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(x, yPos(item.values[hoverIndex]), 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    return { ...plot, xPos, yPos, width, height };
+  }
+
+  function drawYearChart(hoverIndex) {
+    yearGeom = drawChart(yearCanvas, yearCtx, yearDataCache, visibleYearSeries, hoverIndex, null, false);
+  }
+
+  function drawTierChart(hoverIndex) {
+    tierGeom = drawChart(tierCanvas, tierCtx, tierDataCache, visibleTierSeries, hoverIndex, paramConfig.res_annual.val, true);
+  }
+
+  function drawPaybackChart(hoverIndex) {
+    paybackGeom = drawChart(paybackCanvas, paybackCtx, paybackDataCache, visiblePaybackSeries, hoverIndex, paramConfig.res_annual.val, true);
+  }
+
+  function bindChartPointer(canvas, tooltip, getData, getGeometry, visible, draw, isTier) {
+    canvas.addEventListener('pointermove', event => {
+      const data = getData();
+      const geom = getGeometry();
+      if (!data || !geom) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      if (x < geom.left || x > geom.right || y < geom.top || y > geom.bottom) {
+        tooltip.style.display = 'none';
+        draw(null);
+        return;
+      }
+      let index = 0;
+      data.x.forEach((value, i) => {
+        if (Math.abs(geom.xPos(value) - x) < Math.abs(geom.xPos(data.x[index]) - x)) index = i;
+      });
+      draw(index);
+      const title = isTier ? `年缴费 ${fmtCurrency(data.x[index])}` : `累计缴费 ${data.x[index]} 年`;
+      tooltip.innerHTML = `<div class="tooltip-title">${title}</div>` + data.series
+        .filter(item => visible[item.key])
+        .map(item => `<div class="tooltip-row"><span class="tooltip-left"><span class="legend-dot" style="background:${item.color}"></span>${item.label}</span><strong>${data.formatValue ? data.formatValue(item.values[index]) : fmtCurrency(item.values[index]) + (isTier ? '/月' : '')}</strong></div>`).join('');
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.max(0, Math.min(x + 12, rect.width - tooltip.offsetWidth)) + 'px';
+      tooltip.style.top = Math.max(0, Math.min(y + 12, rect.height - tooltip.offsetHeight)) + 'px';
+    });
+    canvas.addEventListener('pointerleave', () => {
+      tooltip.style.display = 'none';
+      draw(null);
+    });
+  }
+
+  bindChartPointer(yearCanvas, yearTooltip, () => yearDataCache, () => yearGeom, visibleYearSeries, drawYearChart, false);
+  bindChartPointer(tierCanvas, tierTooltip, () => tierDataCache, () => tierGeom, visibleTierSeries, drawTierChart, true);
+  bindChartPointer(paybackCanvas, paybackTooltip, () => paybackDataCache, () => paybackGeom, visiblePaybackSeries, drawPaybackChart, true);
+
+  Object.keys(paramConfig).forEach(key => {
+    const slider = sliders[key];
+    const input = inputs[key];
+    function applyValue(value) {
+      const cfg = paramConfig[key];
+      if (!Number.isFinite(value)) value = cfg.val;
+      slider.value = Math.min(cfg.max, Math.max(cfg.min, value));
+      cfg.val = Number(slider.value);
+      input.value = formatDisplayValue(key, cfg.val);
+      calculateAll();
+    }
+    slider.addEventListener('input', () => applyValue(Number(slider.value)));
+    input.addEventListener('change', () => applyValue(parseFloat(input.value.replace(/[¥￥,%％\s]/g, ''))));
+    input.addEventListener('blur', () => { input.value = formatDisplayValue(key, paramConfig[key].val); });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') input.blur();
+    });
+  });
+
+  new ResizeObserver(() => {
+    yearTooltip.style.display = 'none';
+    tierTooltip.style.display = 'none';
+    paybackTooltip.style.display = 'none';
+    drawYearChart(null);
+    drawTierChart(null);
+    drawPaybackChart(null);
+  }).observe(yearCanvas.parentElement);
+  window.addEventListener('resize', () => {
+    drawYearChart(null);
+    drawTierChart(null);
+    drawPaybackChart(null);
+  });
+  calculateAll();
+</script>
+</body>
+</html>
